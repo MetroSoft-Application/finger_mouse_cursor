@@ -3,4 +3,28 @@
     <hand>right</hand>
     <camera>0</camera>
     <window_scale>0.15</window_scale>
+    <model_complexity>0</model_complexity>
+    <queue_length>5</queue_length>
+    <!--    0: 手首
+    1: 親指の付け根
+    2: 親指の第1関節
+    3: 親指の第2関節
+    4: 親指の先端
+    5: 人差し指の付け根
+    6: 人差し指の第1関節
+    7: 人差し指の第2関節
+    8: 人差し指の先端
+    9: 中指の付け根
+    10: 中指の第1関節
+    11: 中指の第2関節
+    12: 中指の先端
+    13: 薬指の付け根
+    14: 薬指の第1関節
+    15: 薬指の第2関節
+    16: 薬指の先端
+    17: 小指の付け根
+    18: 小指の第1関節
+    19: 小指の第2関節
+    20: 小指の先端 -->
+    <selected_joint>5</selected_joint>
 </config>

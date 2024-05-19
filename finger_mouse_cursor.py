@@ -7,11 +7,13 @@ import pyautogui
 from pynput.mouse import Controller
 import time
 import xml.etree.ElementTree as ET
+from collections import deque
 
 # TensorFlowの警告メッセージを抑制する
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 def parse_value(value):
+    """値を適切な型に変換する"""
     if value.isdigit():
         return int(value)
     try:
@@ -27,7 +29,25 @@ def load_config(config_file):
         config[elem.tag] = parse_value(elem.text)
     return config
 
-def process_frame(image, hands, screen_width, screen_height, alpha, ema_x, ema_y, config):
+def clamp(value, min_value, max_value):
+    """値を指定された範囲内にクランプする"""
+    return max(min_value, min(value, max_value))
+
+def update_and_average_queues(x_queue, y_queue, x_value, y_value, max_length):
+    """キューを更新し、移動平均を計算"""
+    x_queue.append(x_value)
+    y_queue.append(y_value)
+    if len(x_queue) > max_length:
+        x_queue.popleft()
+    if len(y_queue) > max_length:
+        y_queue.popleft()
+
+    avg_x = sum(x_queue) / len(x_queue)
+    avg_y = sum(y_queue) / len(y_queue)
+
+    return avg_x, avg_y
+
+def process_frame(image, hands, screen_width, screen_height, config):
     flipped_image = cv2.flip(image, 1)
     flipped_image.flags.writeable = False
     flipped_image = cv2.cvtColor(flipped_image, cv2.COLOR_BGR2RGB)
@@ -49,7 +69,8 @@ def process_frame(image, hands, screen_width, screen_height, alpha, ema_x, ema_y
                 mp_drawing_styles.get_default_hand_landmarks_style(),
                 mp_drawing_styles.get_default_hand_connections_style())
 
-            index_finger_tip = hand_landmarks.landmark[8]
+            selected_joint = config['selected_joint']
+            joint = hand_landmarks.landmark[selected_joint]
 
             # 画像サイズより一回り小さい枠を作成
             frame_h, frame_w, _ = flipped_image.shape
@@ -57,30 +78,24 @@ def process_frame(image, hands, screen_width, screen_height, alpha, ema_x, ema_y
             border_h = frame_h * config['window_scale']
 
             # 座標を小さい枠に当てはめる
-            adjusted_x = (index_finger_tip.x * frame_w -
-                          border_w) / (frame_w - 2 * border_w)
-            adjusted_y = (index_finger_tip.y * frame_h -
-                          border_h) / (frame_h - 2 * border_h)
+            adjusted_x = (joint.x * frame_w - border_w) / \
+                (frame_w - 2 * border_w)
+            adjusted_y = (joint.y * frame_h - border_h) / \
+                (frame_h - 2 * border_h)
 
             # スクリーン座標を計算
             screen_x = int(adjusted_x * screen_width)
             screen_y = int(adjusted_y * screen_height)
+
+            # クランプ処理を追加
+            screen_x = clamp(screen_x, 0, screen_width)
+            screen_y = clamp(screen_y, 0, screen_height)
+
             print(f"x:{screen_x} y:{screen_y}")
 
-            ema_x, ema_y = smooth_coordinates(
-                screen_x, screen_y, ema_x, ema_y, alpha)
-            if keyboard.is_pressed('ctrl'):
-                move_mouse(ema_x, ema_y)
+            return flipped_image, screen_x, screen_y
 
-    return flipped_image, ema_x, ema_y
-
-def smooth_coordinates(screen_x, screen_y, ema_x, ema_y, alpha):
-    if ema_x is None:
-        ema_x, ema_y = screen_x, screen_y
-    else:
-        ema_x = alpha * screen_x + (1 - alpha) * ema_x
-        ema_y = alpha * screen_y + (1 - alpha) * ema_y
-    return ema_x, ema_y
+    return flipped_image, None, None
 
 def move_mouse(screen_x, screen_y):
     mouse.position = (int(screen_x), int(screen_y))
@@ -100,14 +115,11 @@ def main():
 
     mouse = Controller()
 
-    alpha = 0.2
-    ema_x, ema_y = None, None
+    x_queue = deque()
+    y_queue = deque()
 
     fps = 30
     wait_time = int(1000 / fps)
-
-    # 枠のサイズ（例：0.1は画像の10%の枠を作成）
-    window_scale = config['window_scale']
 
     with mp_hands.Hands(
             model_complexity=0,
@@ -120,8 +132,15 @@ def main():
                 print("Ignoring empty camera frame.")
                 continue
 
-            flipped_image, ema_x, ema_y = process_frame(
-                image, hands, screen_width, screen_height, alpha, ema_x, ema_y, config)
+            flipped_image, screen_x, screen_y = process_frame(
+                image, hands, screen_width, screen_height, config)
+
+            if screen_x is not None and screen_y is not None:
+                avg_x, avg_y = update_and_average_queues(
+                    x_queue, y_queue, screen_x, screen_y, config['queue_length'])
+                if keyboard.is_pressed('ctrl'):
+                    move_mouse(avg_x, avg_y)
+
             cv2.imshow('FingerMouseCursor', flipped_image)
 
             elapsed_time = time.time() - start_time
