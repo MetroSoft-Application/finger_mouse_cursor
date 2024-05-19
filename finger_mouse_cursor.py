@@ -4,7 +4,7 @@ import mediapipe as mp
 from mediapipe import solutions
 import keyboard
 import pyautogui
-from pynput.mouse import Controller
+from pynput.mouse import Controller, Button
 import time
 import xml.etree.ElementTree as ET
 from collections import deque
@@ -47,6 +47,10 @@ def update_and_average_queues(x_queue, y_queue, x_value, y_value, max_length):
 
     return avg_x, avg_y
 
+def calculate_distance(point1, point2):
+    """2点間の距離(ユークリッド距離)を計算"""
+    return ((point1.x - point2.x) ** 2 + (point1.y - point2.y) ** 2 + (point1.z - point2.z) ** 2) ** 0.5
+
 def process_frame(image, hands, screen_width, screen_height, config):
     flipped_image = cv2.flip(image, 1)
     flipped_image.flags.writeable = False
@@ -72,6 +76,10 @@ def process_frame(image, hands, screen_width, screen_height, config):
             selected_joint = config['selected_joint']
             joint = hand_landmarks.landmark[selected_joint]
 
+            # 人差し指の先端と親指の先端を取得
+            index_finger_tip = hand_landmarks.landmark[8]
+            thumb_tip = hand_landmarks.landmark[4]
+
             # 画像サイズより一回り小さい枠を作成
             frame_h, frame_w, _ = flipped_image.shape
             border_w = frame_w * config['window_scale']
@@ -93,12 +101,26 @@ def process_frame(image, hands, screen_width, screen_height, config):
 
             print(f"x:{screen_x} y:{screen_y}")
 
-            return flipped_image, screen_x, screen_y
+            # 人差し指と親指の先端の距離を計算
+            distance = calculate_distance(index_finger_tip, thumb_tip)
+            print(f"Distance: {distance}")
 
-    return flipped_image, None, None
+            return flipped_image, screen_x, screen_y, distance
+
+    return flipped_image, None, None, None
 
 def move_mouse(screen_x, screen_y):
     mouse.position = (int(screen_x), int(screen_y))
+
+def click_mouse(distance, click_threshold):
+    if distance < click_threshold:
+        if not mouse.pressed:
+            mouse.press(Button.left)
+            mouse.pressed = True
+    else:
+        if mouse.pressed:
+            mouse.release(Button.left)
+            mouse.pressed = False
 
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -114,12 +136,15 @@ def main():
     screen_width, screen_height = pyautogui.size()
 
     mouse = Controller()
+    mouse.pressed = False
 
     x_queue = deque()
     y_queue = deque()
 
     fps = 30
     wait_time = int(1000 / fps)
+
+    click_threshold = config['click_threshold']  # 距離のしきい値を設定
 
     with mp_hands.Hands(
             model_complexity=0,
@@ -132,7 +157,7 @@ def main():
                 print("Ignoring empty camera frame.")
                 continue
 
-            flipped_image, screen_x, screen_y = process_frame(
+            flipped_image, screen_x, screen_y, distance = process_frame(
                 image, hands, screen_width, screen_height, config)
 
             if screen_x is not None and screen_y is not None:
@@ -140,6 +165,7 @@ def main():
                     x_queue, y_queue, screen_x, screen_y, config['queue_length'])
                 if keyboard.is_pressed('ctrl'):
                     move_mouse(avg_x, avg_y)
+                click_mouse(distance, click_threshold)
 
             cv2.imshow('FingerMouseCursor', flipped_image)
 
