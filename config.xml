@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config>
+    <!-- right:右手のみ,left:左手のみ,both:両手 -->
     <hand>right</hand>
+    <!-- カメラのIndex -->
     <camera>0</camera>
+    <!-- カメラ映像に対するスクリーンのスケジュール -->
     <window_scale>0.15</window_scale>
+    <!-- モデル選択 -->
     <model_complexity>0</model_complexity>
+    <!-- 移動平均の窓幅 -->
     <queue_length>5</queue_length>
-    <!--    0: 手首
+    <!-- カーソル座標に使用する関節
+        0: 手首
         1: 親指の付け根
         2: 親指の第1関節
         3: 親指の第2関節
@@ -27,5 +33,8 @@
         19: 小指の第2関節
         20: 小指の先端 -->
     <selected_joint>5</selected_joint>
-    <click_threshold>0.05</click_threshold>
+    <!-- クリックを認識するための距離 -->
+    <click_threshold>0.07</click_threshold>
+    <!-- クリックを認識するための速度 -->
+    <velocity_threshold>0.1</velocity_threshold>
 </config>

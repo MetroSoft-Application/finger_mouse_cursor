@@ -22,6 +22,7 @@ def parse_value(value):
         return value
 
 def load_config(config_file):
+    """設定ファイルの読み込み"""
     tree = ET.parse(config_file)
     root = tree.getroot()
     config = {}
@@ -48,10 +49,11 @@ def update_and_average_queues(x_queue, y_queue, x_value, y_value, max_length):
     return avg_x, avg_y
 
 def calculate_distance(point1, point2):
-    """2点間の距離(ユークリッド距離)を計算"""
+    """2点間の距離を計算"""
     return ((point1.x - point2.x) ** 2 + (point1.y - point2.y) ** 2 + (point1.z - point2.z) ** 2) ** 0.5
 
 def process_frame(image, hands, screen_width, screen_height, config):
+    """フレーム処理"""
     flipped_image = cv2.flip(image, 1)
     flipped_image.flags.writeable = False
     flipped_image = cv2.cvtColor(flipped_image, cv2.COLOR_BGR2RGB)
@@ -99,7 +101,7 @@ def process_frame(image, hands, screen_width, screen_height, config):
             screen_x = clamp(screen_x, 0, screen_width)
             screen_y = clamp(screen_y, 0, screen_height)
 
-            print(f"x:{screen_x} y:{screen_y}")
+            # print(f"x:{screen_x} y:{screen_y}")
 
             # 人差し指と親指の先端の距離を計算
             distance = calculate_distance(index_finger_tip, thumb_tip)
@@ -110,17 +112,44 @@ def process_frame(image, hands, screen_width, screen_height, config):
     return flipped_image, None, None, None
 
 def move_mouse(screen_x, screen_y):
+    """マウス移動"""
     mouse.position = (int(screen_x), int(screen_y))
 
-def click_mouse(distance, click_threshold):
-    if distance < click_threshold:
+def click_mouse(distance, click_threshold, velocity_threshold, click_state, distance_history):
+    """クリックの状態を更新"""
+    current_time = time.time()
+    distance_history.append((distance, current_time))
+
+    # 古いデータを削除
+    while distance_history and current_time - distance_history[0][1] > 1.0:
+        distance_history.popleft()
+
+    # 距離の変化速度を計算
+    if len(distance_history) >= 2:
+        initial_distance, initial_time = distance_history[0]
+        latest_distance, latest_time = distance_history[-1]
+        distance_change = initial_distance - latest_distance
+        time_change = latest_time - initial_time
+        velocity = distance_change / time_change if time_change != 0 else 0
+        print(f"velocity:{velocity}")
+        # 速度がしきい値を超えた場合のみクリックをトリガー
+        if velocity > velocity_threshold and distance < click_threshold:
+            click_state = True
+        elif distance >= click_threshold:
+            click_state = False
+
+    if click_state:
         if not mouse.pressed:
             mouse.press(Button.left)
             mouse.pressed = True
+            print("press")
     else:
         if mouse.pressed:
             mouse.release(Button.left)
             mouse.pressed = False
+            print("release")
+
+    return click_state
 
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -145,9 +174,12 @@ def main():
     wait_time = int(1000 / fps)
 
     click_threshold = config['click_threshold']  # 距離のしきい値を設定
+    velocity_threshold = config['velocity_threshold']  # 速度のしきい値を設定
+    click_state = False
+    distance_history = deque()
 
     with mp_hands.Hands(
-            model_complexity=0,
+            model_complexity=config['model_complexity'],
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5) as hands:
         while cap.isOpened():
@@ -163,9 +195,10 @@ def main():
             if screen_x is not None and screen_y is not None:
                 avg_x, avg_y = update_and_average_queues(
                     x_queue, y_queue, screen_x, screen_y, config['queue_length'])
-                if keyboard.is_pressed('ctrl'):
-                    move_mouse(avg_x, avg_y)
-                click_mouse(distance, click_threshold)
+                # if keyboard.is_pressed('ctrl'):
+                move_mouse(avg_x, avg_y)
+                click_state = click_mouse(
+                    distance, click_threshold, velocity_threshold, click_state, distance_history)
 
             cv2.imshow('FingerMouseCursor', flipped_image)
 
