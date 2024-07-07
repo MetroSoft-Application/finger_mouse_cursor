@@ -1,6 +1,5 @@
 import os
 import cv2
-import mediapipe as mp
 from mediapipe import solutions
 import keyboard
 import pyautogui
@@ -8,6 +7,8 @@ from pynput.mouse import Controller, Button
 import time
 import xml.etree.ElementTree as ET
 from collections import deque
+import numpy as np
+import ctypes
 
 # TensorFlowの警告メッセージを抑制する
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -49,8 +50,17 @@ def update_and_average_queues(x_queue, y_queue, x_value, y_value, max_length):
     return avg_x, avg_y
 
 def calculate_distance(point1, point2):
+    # 2つの点p, qの座標位置の配列を定義
+    p = np.array([point1.x, point1.y])
+    q = np.array([point2.x, point2.y])
+    # 2点間のユークリッド距離を計算する
+    dist = np.linalg.norm(p - q)
+    print(dist)
+    dist2 = ((point1.x - point2.x) ** 2 + (point1.y - point2.y)
+             ** 2 + (point1.z - point2.z) ** 2) ** 0.5
+    print(dist2)
     """2点間の距離を計算"""
-    return ((point1.x - point2.x) ** 2 + (point1.y - point2.y) ** 2 + (point1.z - point2.z) ** 2) ** 0.5
+    return dist
 
 def process_frame(image, hands, screen_width, screen_height, config):
     """フレーム処理"""
@@ -105,7 +115,7 @@ def process_frame(image, hands, screen_width, screen_height, config):
 
             # 人差し指と親指の先端の距離を計算
             distance = calculate_distance(index_finger_tip, thumb_tip)
-            print(f"Distance: {distance}")
+            # print(f"Distance: {distance}")
 
             return flipped_image, screen_x, screen_y, distance
 
@@ -131,12 +141,14 @@ def click_mouse(distance, click_threshold, velocity_threshold, click_state, dist
         distance_change = initial_distance - latest_distance
         time_change = latest_time - initial_time
         velocity = distance_change / time_change if time_change != 0 else 0
-        print(f"velocity:{velocity}")
+        # print(f"velocity:{velocity}")
         # 速度がしきい値を超えた場合のみクリックをトリガー
-        if velocity > velocity_threshold and distance < click_threshold:
+        if abs(velocity) > velocity_threshold and abs(distance) < click_threshold:
             click_state = True
-        elif distance >= click_threshold:
+        elif abs(distance) >= click_threshold:
             click_state = False
+        print(f"velocity {velocity}")
+        print(f"distance {distance}")
 
     if click_state:
         if not mouse.pressed:
