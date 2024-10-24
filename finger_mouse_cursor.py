@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ET
 from collections import deque
 import numpy as np
 import ctypes
+import distutils.util
 
 # TensorFlowの警告メッセージを抑制する
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -209,8 +210,10 @@ def main():
                     x_queue, y_queue, screen_x, screen_y, config['queue_length'])
                 # if keyboard.is_pressed('ctrl'):
                 move_mouse(avg_x, avg_y)
-                click_state = click_mouse(
-                    distance, click_threshold, velocity_threshold, click_state, distance_history)
+                
+                if distutils.util.strtobool(config['click_enable']) :
+                    click_state = click_mouse(
+                        distance, click_threshold, velocity_threshold, click_state, distance_history)
 
             cv2.imshow('FingerMouseCursor', flipped_image)
 
