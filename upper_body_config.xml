@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <camera>0</camera>
+    <model_complexity>1</model_complexity>
+    <enable_segmentation>false</enable_segmentation>
+    <min_detection_confidence>0.5</min_detection_confidence>
+    <min_tracking_confidence>0.5</min_tracking_confidence>
+    <window_scale>0.1</window_scale>
+    <queue_length>5</queue_length>
+    <pose_control_point>nose</pose_control_point>
+    <always_move_mouse>true</always_move_mouse>
+    <gesture_click_enable>true</gesture_click_enable>
+</config>

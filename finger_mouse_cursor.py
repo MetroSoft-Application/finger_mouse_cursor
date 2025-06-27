@@ -166,7 +166,7 @@ def click_mouse(distance, click_threshold, velocity_threshold, click_state, dist
 
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(script_dir, 'config.xml')
+    config_path = os.path.join(script_dir, 'finger_mouse_cursor_config.xml')
     config = load_config(config_path)
 
     global mp_drawing, mp_drawing_styles, mp_hands, mouse
