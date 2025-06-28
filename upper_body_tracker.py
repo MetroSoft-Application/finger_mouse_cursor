@@ -1,13 +1,18 @@
 import os
+
+# TensorFlowの全てのログメッセージを抑制する（importより前に設定）
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # ERRORレベルのみ表示
+# oneDNN最適化メッセージを抑制する
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+# TensorFlow Liteのログを抑制
+os.environ['TF_LITE_LOG_LEVEL'] = '3'
+
 import cv2
 from mediapipe import solutions
 import time
 import xml.etree.ElementTree as ET
 from collections import deque
 import numpy as np
-
-# TensorFlowの警告メッセージを抑制する
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 def parse_value(value):
     """値を適切な型に変換する"""
